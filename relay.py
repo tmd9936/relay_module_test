@@ -1,13 +1,14 @@
 from ctypes import CDLL, c_int, POINTER
-import os, time
+import os, time, sys
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
 
 if __name__ == "__main__":
-    so_path = os.path.abspath('./')
-    print(so_path)
-    relay_lib = CDLL(so_path + "/usb_relay_device.so")
+    relay_lib = CDLL(resource_path("usb_relay_device.so"))
 
-    
     init = relay_lib.usb_relay_init()
     device_enum = relay_lib.usb_relay_device_enumerate()
     print(device_enum)
