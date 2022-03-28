@@ -7,31 +7,24 @@ project(irop_lift)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
+find_package(catkin REQUIRED
   roscpp
   rospy
-  std_msgs
   std_srvs
-  actionlib_msgs
+  std_msgs
   message_generation
-  #message_runtime
-  #actionlib
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
 
-################################################
-## Declare ROS messages, services and actions ##
-################################################
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  RelayControl.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -41,17 +34,18 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate actions in the 'action' folder
-add_action_files(
-  FILES
-  lift_control.action
-)
+# add_action_files(
+#   FILES
+#   Action1.action
+#   Action2.action
+# )
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
+  # ationlib_msgs  
   std_msgs
   std_srvs
-  actionlib_msgs
 )
 
 ################################################
@@ -70,9 +64,10 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-# LIBRARIES irop_lift
- CATKIN_DEPENDS roscpp rospy std_msgs std_srvs actionlib_msgs
- DEPENDS message_runtime
+   LIBRARIES ${PROJECT_NAME}
+   CATKIN_DEPENDS roscpp rospy srd_srvs std_msgs message_runtime
+#  DEPENDS system_lib
+   DEPENDS message_runtime
 )
 
 ###########
@@ -125,7 +120,7 @@ catkin_install_python(PROGRAMS
 # )
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
-install(DIRECTORY msg src libs
+install(DIRECTORY msg nodes libs
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
@@ -136,4 +131,3 @@ install(FILES ${CATKIN_DEVEL_PREFIX}/libs/usb_relay_device.so
 #############
 ## Testing ##
 #############
-

@@ -2,7 +2,7 @@
 
 import rospy
 import os, sys
-from ctypes import c_int
+from ctypes import CDLL, POINTER, c_int, c_byte, c_char_p, c_uint32, c_void_p, pointer
 import ctypes
 import actionlib
 
@@ -23,102 +23,51 @@ def charpToString(charp):
 def stringToCharp(s):   
     return bytes(s)
 
-def exc(msg):  return Exception(msg)
+global relay_lib, relay_init, relay_device_enum, device
+relay_lib = CDLL(resource_path("../libs/usb_relay_device.so"))
+relay_init = relay_lib.usb_relay_init()
+relay_device_enum = relay_lib.usb_relay_device_enumerate()
 
-def fail(msg) : raise exc(msg)
+relay_device_enum = int(relay_device_enum)
 
-# global relay_lib, relay_init, relay_device_enum, device
-# relay_lib = CDLL(resource_path("../libs/usb_relay_device.so"))
-# relay_init = relay_lib.usb_relay_init()
-# relay_device_enum = relay_lib.usb_relay_device_enumerate()
-
-# relay_device_enum = int(relay_device_enum)
-# print(relay_device_enum)
-
-# device = relay_lib.usb_relay_device_open(relay_device_enum)
-# device = int(device)
-
-class L: pass   # Global object for the DLL
-setattr(L, "dll", None)
-L.dll = ctypes.CDLL(resource_path("../libs/usb_relay_device.so"))
-
-usb_relay_lib_funcs = [
-  # TYpes: h=handle (pointer sized), p=pointer, i=int, e=error num (int), s=string
-  ("usb_relay_device_enumerate",               'h', None),
-  ("usb_relay_device_close",                   'e', 'h'),
-  ("usb_relay_device_open_with_serial_number", 'h', 'si'),
-  ("usb_relay_device_get_num_relays",          'i', 'h'),
-  ("usb_relay_device_get_id_string",           's', 'h'),
-  ("usb_relay_device_next_dev",                'h', 'h'),
-  ("usb_relay_device_get_status_bitmap",       'i', 'h'),
-  ("usb_relay_device_open_one_relay_channel",  'e', 'hi'),
-  ("usb_relay_device_close_one_relay_channel", 'e', 'hi'),
-  ("usb_relay_device_close_all_relay_channel", 'e', None)
-  ]
+print(relay_device_enum)
 
 
-#Get lib version (my extension, not in the original dll)
-libver = L.dll.usb_relay_device_lib_version()  
+device = relay_lib.usb_relay_device_open(relay_device_enum)
+device = int(device)
 
-ret = L.dll.usb_relay_init()
-if ret != 0 : rospy.logerr("Failed lib init!")
-
-"""
-Tweak imported C functions
-This is required in 64-bit mode. Optional for 32-bit (pointer size=int size)
-Functions that return and receive ints or void work without specifying types.
-"""
-ctypemap = { 'e': ctypes.c_int, 'h':ctypes.c_void_p, 'p': ctypes.c_void_p,
-        'i': ctypes.c_int, 's': ctypes.c_char_p}
-
-for x in usb_relay_lib_funcs :
-    fname, ret, param = x
-
-    try:
-        f = getattr(L.dll, fname)
-    except Exception:  
-        fail("Missing lib export:" + fname)
-    ps = []
-    if param :
-        for p in param :
-            ps.append( ctypemap[p] )
-    f.restype = ctypemap[ret]
-    if len(ps) > 0:
-        f.argtypes = ps
-    setattr(L, fname, f)
-
-enuminfo = L.usb_relay_device_enumerate()
-idstrp = L.usb_relay_device_get_id_string(enuminfo)
-idstr = charpToString(idstrp)
-
-device = L.usb_relay_device_open_with_serial_number(stringToCharp(idstr), 5)
+print(device)
 
 def Lift_up(time):
+    global relay_lib, device
+
     print(device)
 
     if time == NO_STOP_TIME:
         rospy.loginfo("LIFT UP")
 
-    channel = L.usb_relay_device_close_one_relay_channel(device, c_int(2))
+    channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(2))
     rospy.loginfo(channel)
-    channel = L.usb_relay_device_open_one_relay_channel(device, c_int(1))
+    channel = relay_lib.usb_relay_device_open_one_relay_channel(device, c_int(1))
     if time != NO_STOP_TIME:
         rospy.loginfo("LIFT HALF UP")
         rospy.sleep(int(time))
-        channel = L.usb_relay_device_close_one_relay_channel(device, c_int(1))
+        channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(1))
     
 def Lift_down(time):
+    global relay_lib, device
+
     if time == NO_STOP_TIME:
         rospy.loginfo("LIFT DOWN")
 
-    channel = L.usb_relay_device_close_one_relay_channel(device, c_int(1))
+    channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(1))
     rospy.loginfo(channel)
 
-    channel = L.usb_relay_device_open_one_relay_channel(device, c_int(2))
+    channel = relay_lib.usb_relay_device_open_one_relay_channel(device, c_int(2))
     if time != NO_STOP_TIME:
         rospy.loginfo("LIFT HALF DOWN")
         rospy.sleep(int(time))
-        channel = L.usb_relay_device_close_one_relay_channel(device, c_int(2))
+        channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(2))
 
 
 class Action_Server():

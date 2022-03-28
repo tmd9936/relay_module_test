@@ -1,0 +1,10 @@
+#Goal
+string direction
+---
+#Result
+string result_key
+int8 result_status
+---
+#Feedback
+string feedback_key
+

@@ -11,8 +11,10 @@ if __name__ == "__main__":
 
     init = relay_lib.usb_relay_init()
     device_enum = relay_lib.usb_relay_device_enumerate()
-    print(device_enum)
+    print(type(device_enum))
     device = relay_lib.usb_relay_device_open(device_enum)
+
+    print(device)
 
     channel = None
 
@@ -22,16 +24,19 @@ if __name__ == "__main__":
             print("up")
             t = input("시간: ")
             channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(2))
+            print(channel)
             channel = relay_lib.usb_relay_device_open_one_relay_channel(device, c_int(1))
-            time.sleep(int(t))
-            channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(1))
+            print(channel)
+
+            # time.sleep(int(t))
+            # channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(1))
         elif s == "d":
             print("down")
             t = input("시간: ")
             channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(1))
             channel = relay_lib.usb_relay_device_open_one_relay_channel(device, c_int(2))
-            time.sleep(int(t))
-            channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(2))
+            # time.sleep(int(t))
+            # channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(2))
         elif s == "us":
             print("up stop")
             channel = relay_lib.usb_relay_device_close_one_relay_channel(device, c_int(1))
