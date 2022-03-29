@@ -8,9 +8,10 @@ $ cd usb-relay-hid-master/commandline/makemake
 
 $ make
 
-usb_relay_device.so를 가져와서 테스트
+take usb_relay_device.so and copy to libs/
 
-USB 권한 설정
+USB authorization setting
+
 $ sudo gedit /etc/udev/rules.d/50-myusb.rules
 
 ```
