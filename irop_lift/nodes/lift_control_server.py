@@ -6,41 +6,29 @@ from ctypes import c_int
 import ctypes
 import actionlib
 
-from std_msgs.msg import Int16
+# from std_msgs.msg import Int16
 from irop_lift.msg import lift_controlAction, lift_controlFeedback, lift_controlResult
 
+RELAY_LIB_PATH = "../libs/usb_relay_device.so"
 HALF_TIME = 13
 NO_STOP_TIME = 0
 
 def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
+    """ Get absolute path to resource"""
     base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
-def charpToString(charp):
-    return str(ctypes.string_at(charp))
+def exc(msg):  
+    rospy.logerr(msg)
+    return Exception(msg)
 
-def stringToCharp(s):   
-    return bytes(s)
+def fail(msg): raise exc(msg)
 
-def exc(msg):  return Exception(msg)
-
-def fail(msg) : raise exc(msg)
-
-# global relay_lib, relay_init, relay_device_enum, device
-# relay_lib = CDLL(resource_path("../libs/usb_relay_device.so"))
-# relay_init = relay_lib.usb_relay_init()
-# relay_device_enum = relay_lib.usb_relay_device_enumerate()
-
-# relay_device_enum = int(relay_device_enum)
-# print(relay_device_enum)
-
-# device = relay_lib.usb_relay_device_open(relay_device_enum)
-# device = int(device)
+global device
 
 class L: pass   # Global object for the DLL
 setattr(L, "dll", None)
-L.dll = ctypes.CDLL(resource_path("../libs/usb_relay_device.so"))
+L.dll = ctypes.CDLL(resource_path(RELAY_LIB_PATH))
 
 usb_relay_lib_funcs = [
   # TYpes: h=handle (pointer sized), p=pointer, i=int, e=error num (int), s=string
@@ -56,10 +44,6 @@ usb_relay_lib_funcs = [
   ("usb_relay_device_close_all_relay_channel", 'e', None)
   ]
 
-
-#Get lib version (my extension, not in the original dll)
-libver = L.dll.usb_relay_device_lib_version()  
-
 ret = L.dll.usb_relay_init()
 if ret != 0 : rospy.logerr("Failed lib init!")
 
@@ -70,7 +54,6 @@ Functions that return and receive ints or void work without specifying types.
 """
 ctypemap = { 'e': ctypes.c_int, 'h':ctypes.c_void_p, 'p': ctypes.c_void_p,
         'i': ctypes.c_int, 's': ctypes.c_char_p}
-
 for x in usb_relay_lib_funcs :
     fname, ret, param = x
 
@@ -87,39 +70,33 @@ for x in usb_relay_lib_funcs :
         f.argtypes = ps
     setattr(L, fname, f)
 
-enuminfo = L.usb_relay_device_enumerate()
-idstrp = L.usb_relay_device_get_id_string(enuminfo)
-idstr = charpToString(idstrp)
-
-device = L.usb_relay_device_open_with_serial_number(stringToCharp(idstr), 5)
-
 def Lift_up(time):
-    print(device)
-
-    if time == NO_STOP_TIME:
-        rospy.loginfo("LIFT UP")
-
+    global device
     channel = L.usb_relay_device_close_one_relay_channel(device, c_int(2))
     rospy.loginfo(channel)
     channel = L.usb_relay_device_open_one_relay_channel(device, c_int(1))
+    rospy.loginfo(channel)
+
     if time != NO_STOP_TIME:
         rospy.loginfo("LIFT HALF UP")
         rospy.sleep(int(time))
         channel = L.usb_relay_device_close_one_relay_channel(device, c_int(1))
+    else:
+        rospy.loginfo("LIFT UP")
     
 def Lift_down(time):
-    if time == NO_STOP_TIME:
-        rospy.loginfo("LIFT DOWN")
-
+    global device
     channel = L.usb_relay_device_close_one_relay_channel(device, c_int(1))
     rospy.loginfo(channel)
-
     channel = L.usb_relay_device_open_one_relay_channel(device, c_int(2))
+    rospy.loginfo(channel)
+
     if time != NO_STOP_TIME:
         rospy.loginfo("LIFT HALF DOWN")
         rospy.sleep(int(time))
         channel = L.usb_relay_device_close_one_relay_channel(device, c_int(2))
-
+    else:
+        rospy.loginfo("LIFT DOWN")
 
 class Action_Server():
     def __init__(self):
@@ -131,6 +108,7 @@ class Action_Server():
         self.lift_server.start()
 
     def execute_cb(self, goal):
+        global L, device
         feedback = lift_controlFeedback()
         result_a = lift_controlResult()
 
@@ -138,50 +116,60 @@ class Action_Server():
         result_str = ''
         rate = rospy.Rate(20)
 
-        if goal.direction == "up":
-            feedback_str = "upppp"
-            feedback.feedback_key = feedback_str
+        try:
+            enuminfo = L.usb_relay_device_enumerate()
+            idstrp = L.usb_relay_device_get_id_string(enuminfo)
+            device = L.usb_relay_device_open_with_serial_number(idstrp, 5)
 
-            result_str = "LIFT UP DONE!"
-            result_a.result_key = result_str
+            if goal.direction == "up":
+                feedback_str = "upppp"
+                feedback.feedback_key = feedback_str
 
-            self.lift_server.publish_feedback(feedback)
-            Lift_up(NO_STOP_TIME)
+                result_str = "LIFT UP DONE!"
+                result_a.result_key = result_str
 
-        elif goal.direction == "hup":
-            feedback_str = "half upppp"
-            feedback.feedback_key = feedback_str
+                self.lift_server.publish_feedback(feedback)
+                Lift_up(NO_STOP_TIME)
 
-            result_str = "LIFT HALF UP DONE!"
-            result_a.result_key = result_str
+            elif goal.direction == "hup":
+                feedback_str = "half upppp"
+                feedback.feedback_key = feedback_str
 
-            self.lift_server.publish_feedback(feedback)
-            Lift_up(HALF_TIME)
+                result_str = "LIFT HALF UP DONE!"
+                result_a.result_key = result_str
 
-        elif goal.direction == "down":
-            feedback_str = "downnnn"
-            feedback.feedback_key = feedback_str
+                self.lift_server.publish_feedback(feedback)
+                Lift_up(HALF_TIME)
 
-            result_str = "LIFT DOWN DONE!"
-            result_a.result_key = result_str
+            elif goal.direction == "down":
+                feedback_str = "downnnn"
+                feedback.feedback_key = feedback_str
 
-            self.lift_server.publish_feedback(feedback)            
-            Lift_down(NO_STOP_TIME)
+                result_str = "LIFT DOWN DONE!"
+                result_a.result_key = result_str
 
-        elif goal.direction == "hdown":
-            feedback_str = "half downnnn"
-            feedback.feedback_key = feedback_str
+                self.lift_server.publish_feedback(feedback)            
+                Lift_down(NO_STOP_TIME)
 
-            result_str = "LIFT HALF DOWN DONE!"
-            result_a.result_key = result_str
+            elif goal.direction == "hdown":
+                feedback_str = "half downnnn"
+                feedback.feedback_key = feedback_str
 
-            self.lift_server.publish_feedback(feedback)            
-            Lift_down(HALF_TIME)
+                result_str = "LIFT HALF DOWN DONE!"
+                result_a.result_key = result_str
 
-        else:
-            pass
+                self.lift_server.publish_feedback(feedback)            
+                Lift_down(HALF_TIME)
 
-        self.lift_server.set_succeeded(result_a)
+            else:
+                pass
+
+            self.lift_server.set_succeeded(result_a)
+        except Exception:  
+            fail("fail call enum or device:")
+        finally:
+            device_close = L.usb_relay_device_close(enuminfo)
+            # realy_exit = L.usb_relay_exit()
 
 
 if __name__ == "__main__":
@@ -190,5 +178,5 @@ if __name__ == "__main__":
 
     s = Action_Server()
     rospy.spin()
-    # device_close = relay_lib.usb_relay_device_close(relay_device_enum)
-    # realy_exit = relay_lib.usb_relay_exit()
+    # device_close = L.usb_relay_device_close(enuminfo)
+    # realy_exit = L.usb_relay_exit()
